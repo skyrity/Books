@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>图书管理</title>
+    <!--需要引入的依赖-->
+    <script src="https://unpkg.com/vue/dist/vue.js"></script>
+    <script src="/statics/js/axios.min.js"></script>
+    <style>
+        * {
+            padding: 0;
+            margin: 0;
+        }
+
+        .container {
+
+            width: 1024px;
+            margin: 0 auto;
+        }
+
+        .container h1 {
+            text-align: center;
+            padding: 20px 0 10px 0;
+        }
+
+        #table1 {
+            background-color: #CCE8EB;
+            border-collapse: collapse;
+            margin: 0 auto;
+            width: 100%;
+            font-size: 20px;
+            text-align: center;
+        }
+
+        #table1 tr {
+            height: 50px;
+            line-height: 50px;
+        }
+
+        #table1 button {
+            font-size: 20px;
+        }
+
+        #table2 {
+            border-collapse: collapse;
+            margin: 0 auto;
+            text-align: center;
+            width: 100%;
+            font-size: 20px;
+        }
+
+        #table2 thead th {
+            background-color: #CCE8EB;
+
+        }
+
+        #table2 tr:nth-child(even) {
+            background: #F5FAFA;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="container">
+        <h1>图书管理</h1>
+        <table id="table1" border="1">
+            <tr>
+                <td width="40%">
+                    <label>编号：</label>
+                    <label>
+                        <input type="text" name="id" v-model="id" disabled="false" v-focus/>
+                    </label>
+                </td>
+                <td width="40%">
+                    <label>名称:</label>
+                    <label>
+                        <input type="text" name="name" v-model="name"/>
+                    </label>
+                </td>
+                <td width="20%">
+                    <button @click="toAdd" :disabled="submitFlag">提交</button>
+                </td>
+
+            </tr>
+            <tr>
+                <td colspan="3">
+                    当前图书数为:{{total}}
+                </td>
+            </tr>
+        </table>
+        <table id="table2">
+            <thead>
+            <tr>
+                <th width="10%">编号</th>
+                <th width="40%">名称</th>
+                <th width="30%">修改时间</th>
+                <th width="20%">操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr :key="book.id" v-for="book in books">
+                <td>{{book.id}}</td>
+                <td>{{book.name}}</td>
+                <td>{{book.createDate }}</td>
+                <td>
+                    <a href="" @click.prevent='toEdit(book.id)'>修改</a>
+                    <span> | </span>
+                    <a href="" @click.prevent='toDelete(book.id)'>删除</a>
+                </td>
+
+            </tr>
+
+            </tbody>
+
+        </table>
+    </div>
+</div>
+</body>
+<script>
+
+    //自定义命令
+    Vue.directive('focus', {
+        inserted: function (el) {
+            console.log(el);
+            el.focus()
+        }
+
+    });
+    //定义日期格式过滤器
+    Vue.filter('format', function (value, arg) {
+
+        function dateFormat(date, fmt) {
+            let ret;
+            const opt = {
+                "Y+": date.getFullYear().toString(),        // 年
+                "m+": (date.getMonth() + 1).toString(),     // 月
+                "d+": date.getDate().toString(),            // 日
+                "H+": date.getHours().toString(),           // 时
+                "M+": date.getMinutes().toString(),         // 分
+                "S+": date.getSeconds().toString()          // 秒
+                // 有其他格式化字符需求可以继续添加，必须转化成字符串
+            };
+            for (let k in opt) {
+                ret = new RegExp("(" + k + ")").exec(fmt);
+                if (ret) {
+                    fmt = fmt.replace(ret[1], (ret[1].length === 1) ? (opt[k]) : (opt[k].padStart(ret[1].length, "0")))
+                }
+            }
+            return fmt;
+        }
+
+        return dateFormat(value, arg);
+
+    });
+    //设置axios基本路径
+    axios.defaults.baseURL='http://localhost:8080/';
+    axios.interceptors.response.use(function (res) {
+        return res.data;
+    },function (err) {
+       console.log(err);
+    })
+    //实例化Vue对象
+    new Vue({
+        el: '#app',
+        data: {
+            id: '',
+            name: '',
+            flag: false,
+            submitFlag: false,
+            books: []
+        },
+        //方法
+        methods: {
+            toAdd:  async function () {
+                if (this.flag) {
+                    //修改图书
+//                    this.books.some(item => {
+//                        if (item.id === this.id) {
+//                            item.name = this.name;
+//                            return true
+//                        }
+//                    })
+                    const ret= await axios.put('books/'+this.id,{"name":this.name});
+                    console.log(ret);
+                    if(ret.result_code===0){
+                        this.getAllBook();
+                    }
+
+                } else {
+                    //添加图书
+//                    const book = {};
+//                    book.id = this.id;
+//                    book.name = this.name;
+//                    book.createDate = new Date();
+//                    this.books.push(book);
+                   const ret= await axios.post('books',{"name":this.name});
+                   console.log(ret);
+                   if(ret.result_code===0){
+                       this.getAllBook();
+                    }
+                }
+                this.id = '';
+                this.name = '';
+                this.flag = false
+            },
+            toEdit:async function (id) {
+//                const books = this.books.filter(function (item) {
+//                    return item.id === id
+//                });
+//                console.log(books);
+//                this.id = books[0].id;
+//                this.name = books[0].name;
+                this.flag = true
+                //根据id查询出对应的图书信息
+                var data=await axios.get("books/"+id);
+                if(data){
+
+                    this.id =data.result_data.id;
+                    this.name =data.result_data.name;
+                }
+
+
+            },
+            toDelete:async function (id) {
+                console.log(id);
+//                //第1种方法
+//                this.books = this.books.filter(function (item) {
+//                    return item.id !== id
+//                })
+            //第2种方法
+            //			  		var index=this.books.findIndex(function(item){
+            //			  			return item.id=id
+            //			  		})
+            //			  		this.books.splice(index,1);
+
+                const ret=await axios.delete("books/"+id);
+                if(ret.result_code==0){
+                    this.getAllBook();
+                }
+
+            },
+
+
+            //获得图书数据(图步)，
+            async getAllBook(){
+                this.books= await axios.get("books");
+            }
+        },
+        //计算
+        computed: {
+            total: function () {
+                return this.books.length;
+            }
+        },
+        //侦听器
+        watch: {
+            name: async function (val) {
+                if(! val){
+                    return;
+                }
+               const data=await axios.get("books/book/"+ val);
+               console.log(data);
+               if(data && data.result_data && data.result_data.flag){
+                       this.submitFlag =true
+               }else{
+                       this.submitFlag =false;
+               }
+
+
+//               if(ret.status)
+//                this.submitFlag = this.books.some(function (item) {
+//                    return item.name === val;
+//                });
+            }
+        },
+        //生命周期函数，代表模板可以使用
+        mounted: function () {
+                this.getAllBook();
+//              axios.get("books").then((ret)=> {
+//                console.log(ret.data)
+//                this.books=ret.data;
+//              })
+//            this.books = [
+//                {
+//                    id: 1,
+//                    name: 'test01',
+//                    createDate: new Date(1569895200000),
+//                },
+//                {
+//                    id: 2,
+//                    name: 'test02',
+//                    createDate: new Date(1569985200000),
+//                },
+//                {
+//                    id: 3,
+//                    name: 'test03',
+//                    createDate: new Date(1569985200000),
+//                },
+//                {
+//                    id: 4,
+//                    name: 'test04',
+//                    createDate: new Date(1569985200000),
+//                }
+//            ];
+        }
+    });
+
+
+</script>
+
+</html>
